@@ -60,91 +60,88 @@ export const Contact = () => {
     };
   }, [isBlocked, timeLeft]);
 
-  const validateForm = () => {
+  const validateForm = (data: typeof formData) => {
     const newErrors: {[key: string]: string} = {};
 
-    if (!formData.name.trim()) {
+    if (!data.name.trim()) {
       newErrors.name = "Nome é obrigatório";
-    } else if (formData.name.trim().length < 2) {
+    } else if (data.name.trim().length < 2) {
       newErrors.name = "Nome deve ter pelo menos 2 caracteres";
-    } else if (formData.name.trim().length > 100) {
+    } else if (data.name.trim().length > 100) {
       newErrors.name = "Nome deve ter no máximo 100 caracteres";
     }
 
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
       newErrors.email = "Email inválido";
     }
 
-    if (formData.phone && !/^[\d\s\(\)\-\+]+$/.test(formData.phone)) {
+    if (data.phone && !/^[\d\s\(\)\-\+]+$/.test(data.phone)) {
       newErrors.phone = "Telefone inválido";
     }
 
-    if (!formData.email && !formData.phone) {
+    if (!data.email && !data.phone) {
       newErrors.contact = "Forneça pelo menos email ou telefone";
     }
 
-    if (!formData.message.trim()) {
+    if (!data.message.trim()) {
       newErrors.message = "Mensagem é obrigatória";
-    } else if (formData.message.trim().length < 10) {
+    } else if (data.message.trim().length < 10) {
       newErrors.message = "Mensagem deve ter pelo menos 10 caracteres";
-    } else if (formData.message.trim().length > 1000) {
+    } else if (data.message.trim().length > 1000) {
       newErrors.message = "Mensagem deve ter no máximo 1000 caracteres";
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return Object.keys(newErrors).length === 0 ? {} : newErrors;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (isBlocked) {
-      toast({
-        title: "Aguarde",
-        description: `Por favor, aguarde ${timeLeft} segundos antes de enviar outro formulário.`,
-        variant: "destructive",
-      });
-      return;
-    }
+    if (isSubmitting || isBlocked) return;
 
-    if (!validateForm()) {
-      toast({
-        title: "Erro de validação",
-        description: "Por favor, corrija os erros no formulário.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!companyId) {
-      toast({
-        title: "Erro",
-        description: "Erro interno. Tente novamente.",
-        variant: "destructive",
-      });
+    // Validar formulário
+    const validationErrors = validateForm(formData);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      // Salvar no banco de dados primeiro
-      const { error: dbError } = await supabase
-        .from('contact_form_leads')
-        .insert({
-          company_id: companyId,
-          name: formData.name.trim(),
-          email: formData.email.trim() || null,
-          phone: formData.phone.trim() || null,
-          message: formData.message.trim(),
-          status: 'NEW',
-          contacted: false
-        });
+      // Verificar número de leads existentes
+      const [chatbotResponse, contactResponse] = await Promise.all([
+        supabase
+          .from('chatbot_leads')
+          .select('*')
+          .eq('company_id', companyId),
+        supabase
+          .from('contact_form_leads')
+          .select('*')
+          .eq('company_id', companyId)
+      ]);
 
-      if (dbError) throw dbError;
+      // Log dos erros se houver
+      if (chatbotResponse.error) {
+        console.error("Erro na consulta de chatbot leads:", chatbotResponse.error);
+        throw chatbotResponse.error;
+      }
+      if (contactResponse.error) {
+        console.error("Erro na consulta de contact leads:", contactResponse.error);
+        throw contactResponse.error;
+      }
 
-      // Enviar email usando a edge function
-      const { data: emailData, error: emailError } = await supabase.functions.invoke('send-contact-email', {
+
+      const chatbotCount = (chatbotResponse.data || []).length;
+      const contactCount = (contactResponse.data || []).length;
+
+      const totalLeads = chatbotCount + contactCount;
+
+      let shouldSaveToDatabase = totalLeads < 25;
+
+      // Enviar email (sempre enviar, independente do limite)
+      const { error: emailError } = await supabase.functions.invoke('send-contact-email', {
         body: {
           name: formData.name.trim(),
           email: formData.email.trim() || null,
@@ -154,13 +151,38 @@ export const Contact = () => {
         }
       });
 
+      // Salvar no banco apenas se estiver dentro do limite
+      let databaseError = null;
+      if (shouldSaveToDatabase) {
+        const { error } = await supabase
+          .from('contact_form_leads')
+          .insert({
+            company_id: companyId,
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone,
+            message: formData.message,
+            status: 'NEW',
+            contacted: false
+          });
+        
+        databaseError = error;
+      }
+
       if (emailError) {
-        // Não falhar se o email não for enviado, pois o lead já foi salvo
-        toast({
-          title: "Lead salvo!",
-          description: "Seu contato foi registrado. O email pode ter falhado, mas seu lead foi salvo.",
-          variant: "default",
-        });
+        if (shouldSaveToDatabase && !databaseError) {
+          toast({
+            title: "Mensagem recebida!",
+            description: "Seu contato foi registrado. O email pode ter falhado, mas sua mensagem foi salva.",
+            variant: "default",
+          });
+        } else {
+          toast({
+            title: "Erro",
+            description: "Erro ao enviar email. Tente novamente.",
+            variant: "destructive",
+          });
+        }
       } else {
         toast({
           title: "Mensagem enviada!",
@@ -169,7 +191,7 @@ export const Contact = () => {
 
         // Bloquear o formulário por 3 minutos
         setIsBlocked(true);
-        setTimeLeft(180); // 3 minutos em segundos
+        setTimeLeft(1); // 3 minutos em segundos
         localStorage.setItem('form_block', JSON.stringify({ timestamp: Date.now() }));
       }
       

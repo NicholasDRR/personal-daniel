@@ -365,6 +365,33 @@ export const ChatBot = () => {
     };
 
     try {
+      // Verificar número de leads existentes
+      const [chatbotResponse, contactResponse] = await Promise.all([
+        supabase
+          .from('chatbot_leads')
+          .select('*')
+          .eq('company_id', COMPANY_CONFIG.COMPANY_ID),
+        supabase
+          .from('contact_form_leads')
+          .select('*')
+          .eq('company_id', COMPANY_CONFIG.COMPANY_ID)
+      ]);
+
+      // Log dos erros se houver
+      if (chatbotResponse.error) {
+        console.error("Erro na consulta de chatbot leads:", chatbotResponse.error);
+        throw chatbotResponse.error;
+      }
+      if (contactResponse.error) {
+        console.error("Erro na consulta de contact leads:", contactResponse.error);
+        throw contactResponse.error;
+      }
+
+      const chatbotCount = (chatbotResponse.data || []).length;
+      const contactCount = (contactResponse.data || []).length;
+
+      const totalLeads = chatbotCount + contactCount;
+
       const height = parseFloat(sanitizedData.height);
       const weight = parseFloat(sanitizedData.weight);
       const bmi = height > 0 ? weight / (height * height) : null;
@@ -401,37 +428,43 @@ export const ChatBot = () => {
         notes: enhancedNotes,
       };
 
-      const { data: testData, error: testError } = await supabase
-        .from("chatbot_leads")
-        .select("count")
-        .limit(1);
+      // Salvar no banco apenas se estiver dentro do limite
+      if (totalLeads < 25) {
+        const { data: testData, error: testError } = await supabase
+          .from("chatbot_leads")
+          .select("count")
+          .limit(1);
 
-      if (testError) {
-        console.error("%c[CHATBOT ERROR - TESTE DE CONEXÃO]", "background: #ef4444; color: white; padding: 2px 5px; border-radius: 3px;", testError);
-        throw new Error(`Erro no teste de conexão: ${testError.message}`);
-      }
+        if (testError) {
+          console.error("%c[CHATBOT ERROR - TESTE DE CONEXÃO]", "background: #ef4444; color: white; padding: 2px 5px; border-radius: 3px;", testError);
+          throw new Error(`Erro no teste de conexão: ${testError.message}`);
+        }
 
-      const { data, error: dbError } = await supabase
-        .from("chatbot_leads")
-        .insert(leadData)
-        .select()
-        .single();
+        const { data: savedData, error: dbError } = await supabase
+          .from("chatbot_leads")
+          .insert(leadData)
+          .select()
+          .single();
 
-      if (dbError) {
-        console.error("%c[CHATBOT ERROR - INSERÇÃO]", "background: #ef4444; color: white; padding: 2px 5px; border-radius: 3px;", {
-          message: dbError.message,
-          details: dbError.details,
-          hint: dbError.hint,
-          code: dbError.code,
-        });
-        throw dbError;
+        if (dbError) {
+          console.error("%c[CHATBOT ERROR - INSERÇÃO]", "background: #ef4444; color: white; padding: 2px 5px; border-radius: 3px;", {
+            message: dbError.message,
+            details: dbError.details,
+            hint: dbError.hint,
+            code: dbError.code,
+          });
+          throw dbError;
+        }
+
+        await handleSuccessfulSave(savedData, sanitizedData, recommendedPlan);
+      } else {
+        // Se excedeu o limite, apenas processa o sucesso sem os dados salvos
+        await handleSuccessfulSave(null, sanitizedData, recommendedPlan);
       }
 
       localStorage.setItem(RATE_LIMIT_KEY, Date.now().toString());
       setIsRateLimited(true);
       setRemainingSeconds(RATE_LIMIT_SECONDS);
-
-      await handleSuccessfulSave(data, sanitizedData, recommendedPlan);
     } catch (error: any) {
       console.error("Erro ao salvar dados:", error);
       toast({

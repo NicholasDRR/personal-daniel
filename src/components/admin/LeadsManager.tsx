@@ -591,6 +591,25 @@ export const LeadsManager = () => {
         </div>
       </div>
 
+      {/* Mensagem de limite de leads */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-600">
+              O limite de leads por empresa é 25. Para aumentar o limite, entre em contato com o suporte.
+            </p>
+            <Badge variant={allLeads.length >= 25 ? "destructive" : "secondary"}>
+              {allLeads.length}/25 leads
+            </Badge>
+          </div>
+          {allLeads.length >= 25 && (
+            <p className="text-sm text-red-600 mt-2">
+              Você atingiu o limite de 25 leads. Não é possível criar novos leads. Para aumentar o limite, entre em contato com o suporte.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Filtros */}
       <Card>
         <CardContent className="p-4">

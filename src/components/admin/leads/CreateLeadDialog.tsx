@@ -79,6 +79,30 @@ export const CreateLeadDialog = ({ onLeadCreated }: CreateLeadDialogProps) => {
     setIsLoading(true);
 
     try {
+      // Verificar número de leads existentes
+      const [{ count: chatbotCount }, { count: contactCount }] = await Promise.all([
+        supabase
+          .from('chatbot_leads')
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', COMPANY_CONFIG.COMPANY_ID),
+        supabase
+          .from('contact_form_leads')
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', COMPANY_CONFIG.COMPANY_ID)
+      ]);
+
+      const totalLeads = (chatbotCount || 0) + (contactCount || 0);
+
+      if (totalLeads >= 25) {
+        showToast({
+          title: "Limite Atingido",
+          description: "Você atingiu o limite de 25 leads. Para aumentar o limite, entre em contato com o suporte.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
       if (leadType === 'contact') {
         const { error } = await supabase
           .from('contact_form_leads')
