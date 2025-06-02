@@ -82,7 +82,9 @@ serve(async (req) => {
     console.log('No existing subscription found, creating new subscription for user:', user.email);
     
     // Get monthly value for this client
+    console.log('User email:', user.email);
     const monthlyValueCents = getClientMonthlyValue(user.email);
+    console.log('Monthly value in cents:', monthlyValueCents);
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
