@@ -23,7 +23,7 @@ export const useSubscription = () => {
     const clientPlans: Record<string, number> = {
       // Adicione seus clientes aqui:
       // "cliente1@email.com": 200,
-      // "cliente2@email.com": 350,
+      "nicholasreis48@gmail.com": 350,
       
       // Valor padrão
       "default": 250,
