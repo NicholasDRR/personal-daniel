@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -15,6 +14,7 @@ const getClientMonthlyValue = (email: string): number => {
     // "cliente1@email.com": 20000, // R$ 200 em centavos
     // "cliente2@email.com": 35000, // R$ 350 em centavos
     // "cliente3@email.com": 15000, // R$ 150 em centavos
+    "nicholasreis00@gmail.com": 50000, // R$ 500 em centavos
     
     // Para teste, qualquer email terá valor padrão
     "default": 25000, // R$ 250 padrão
