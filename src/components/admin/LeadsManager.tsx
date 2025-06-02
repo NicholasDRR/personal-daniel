@@ -8,10 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MessageSquare, Mail, Phone, Calendar, User, Edit, Check, RefreshCw, Plus, Filter, Search } from "lucide-react";
+import { MessageSquare, Mail, Phone, Calendar, User, Edit, Check, RefreshCw, Plus, Filter, Search, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useCompanyId } from "@/hooks/useCompanyId";
 import { CreateLeadDialog } from "./leads/CreateLeadDialog";
+import { cleanupOldLeads } from "@/utils/leadCleanup";
 
 interface ChatbotLead {
   id: string;
@@ -71,6 +72,8 @@ export const LeadsManager = () => {
   const [activeView, setActiveView] = useState<'all' | 'chatbot' | 'contact'>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isCleanupDialogOpen, setIsCleanupDialogOpen] = useState(false);
+  const [leadToDelete, setLeadToDelete] = useState<Lead | null>(null);
 
   useEffect(() => {
     if (companyId) {
@@ -267,6 +270,39 @@ export const LeadsManager = () => {
       : (lead as ContactLead).status;
   };
 
+  const handleDeleteLead = async (lead: Lead) => {
+    if (!companyId) return;
+
+    try {
+      setIsLoading(true);
+      const tableName = lead.type === 'chatbot' ? 'chatbot_leads' : 'contact_form_leads';
+      
+      const { error } = await supabase
+        .from(tableName)
+        .delete()
+        .eq('id', lead.id)
+        .eq('company_id', companyId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Lead excluído!",
+        description: "Lead foi excluído com sucesso.",
+      });
+
+      loadLeads();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir lead.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+      setLeadToDelete(null);
+    }
+  };
+
   const renderLeadCard = (lead: Lead) => (
     <Card key={lead.id}>
       <CardHeader className="pb-4">
@@ -397,10 +433,86 @@ export const LeadsManager = () => {
               </div>
             </DialogContent>
           </Dialog>
+
+          <Dialog open={leadToDelete?.id === lead.id} onOpenChange={(open) => !open && setLeadToDelete(null)}>
+            <DialogTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                onClick={() => setLeadToDelete(lead)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Confirmar Exclusão</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600">
+                  Tem certeza que deseja excluir este lead? Esta ação não pode ser desfeita.
+                </p>
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => setLeadToDelete(null)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleDeleteLead(lead)}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    ) : (
+                      <Trash2 className="h-4 w-4 mr-2" />
+                    )}
+                    Confirmar Exclusão
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </CardContent>
     </Card>
   );
+
+  const handleCleanupLeads = async () => {
+    if (!companyId) return;
+
+    try {
+      setIsLoading(true);
+      const result = await cleanupOldLeads(companyId);
+
+      if (result.success) {
+        toast({
+          title: "Sucesso",
+          description: result.message,
+        });
+        loadLeads(); // Recarregar a lista de leads
+      } else {
+        toast({
+          title: "Erro",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao limpar leads antigos",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+      setIsCleanupDialogOpen(false);
+    }
+  };
 
   if (isLoadingCompanyId || isLoading) {
     return (
@@ -424,6 +536,49 @@ export const LeadsManager = () => {
         <h2 className="text-xl md:text-2xl font-bold text-preto-grafite">Gerenciamento de Leads</h2>
         <div className="flex gap-2">
           <CreateLeadDialog onLeadCreated={loadLeads} />
+          <Dialog open={isCleanupDialogOpen} onOpenChange={setIsCleanupDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                Limpar Leads Antigos
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Confirmar Limpeza de Leads</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600">
+                  Esta ação irá excluir permanentemente todos os leads não convertidos com mais de 6 meses de idade.
+                  Esta ação não pode ser desfeita.
+                </p>
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsCleanupDialogOpen(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleCleanupLeads}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    ) : (
+                      <Trash2 className="h-4 w-4 mr-2" />
+                    )}
+                    Confirmar Limpeza
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Button
             onClick={loadLeads}
             variant="outline"
