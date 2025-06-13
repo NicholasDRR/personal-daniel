@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Filter, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -136,7 +135,7 @@ export const Gallery = () => {
               <img
                 src={selectedImage}
                 alt="Galeria"
-                className="w-full h-full object-contain rounded-lg"
+                className="max-w-full max-h-[80vh] object-contain mx-auto rounded-lg"
               />
             </div>
           </div>
