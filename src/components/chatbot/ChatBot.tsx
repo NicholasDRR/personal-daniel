@@ -113,7 +113,7 @@ export const ChatBot = () => {
     },
     {
       content: selectedPlan
-        ? "Para criar um plano personalizado, preciso conhecer um pouco sobre você. Vamos começarJon começar? 😊"
+        ? "Para criar um plano personalizado, preciso conhecer um pouco sobre você. Vamos começar? 😊"
         : "Vou fazer algumas perguntas para entender melhor seus objetivos e recomendar o melhor plano. Vamos começar? 😊",
       delay: 2000,
     },

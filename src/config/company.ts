@@ -3,7 +3,7 @@
 
 export const COMPANY_CONFIG = {
   // ID da empresa a ser exibida
-  COMPANY_ID: "11111111-1111-1111-1111-111111111111", // Nicholas Reis (FitTech Solutions)
+  COMPANY_ID: "1b3b46dc-19c0-42d5-9f44-426ce6f622e9", // Nicholas Reis (FitTech Solutions)
   
   // Para facilitar a identificação, você pode adicionar comentários:
   // "00000000-0000-0000-0000-000000000001" = Nicholas Reis (FitTech Solutions)
