@@ -37,7 +37,7 @@ export const SimpleSubscriptionCheck = ({ children }: SimpleSubscriptionCheckPro
         }
 
         // Verificação especial para o email nicholasreis48@gmail.com
-        if (authorizedEmail.email === 'nicholasreis48@gmail.com') {
+        if (authorizedEmail.email === 'nicholasreis48@gmail.com' || authorizedEmail.email === 'nicholasreis01@gmail.com') {
           setIsSubscribed(true);
           setIsLoading(false);
           return;

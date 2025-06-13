@@ -44,7 +44,7 @@ export const useSubscription = () => {
       }
 
       // Verificação especial para o email nicholasreis48@gmail.com
-      if (user.email === 'nicholasreis48@gmail.com') {
+      if (user.email === 'nicholasreis48@gmail.com' || user.email === 'nicholasreis01@gmail.com') {
         const mockSubscriptionData = {
           subscribed: true,
           subscription_tier: 'Premium',
